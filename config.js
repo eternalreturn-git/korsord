@@ -14,6 +14,6 @@
  * "HTTP-referrer"-restriktion på nyckeln i Google AI Studio / Google Cloud.
  */
 window.KORSORD_CONFIG = {
-  apiKey: '',                    // <-- klistra in din gratis nyckel här
-  geminiModel: 'gemini-2.0-flash' // byt vid behov, t.ex. 'gemini-2.5-flash'
+  apiKey: '',                     // tomt = ange nyckeln en gång i panelen på sidan (sparas lokalt på enheten)
+  geminiModel: 'gemini-2.5-flash' // faller automatiskt till gemini-2.5-flash-lite vid behov
 };

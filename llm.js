@@ -31,9 +31,10 @@
     return 'Skapa ord till ett svenskt korsord. Tema: "' + theme + '". ' +
       'Svårighetsgrad: ' + diffLabel(diff) + '. ' +
       'Ge exakt ' + count + ' ord som verkligen hör till temat. Varje ord: ' + lengthRule(diff) + '. ' +
-      'Krav: "svar" ska vara ETT enda svenskt ord, endast bokstäver A-Ö, ' +
-      'inga mellanslag, inga bindestreck. "ledtrad" ska vara på svenska, kort, ' +
-      'och får INTE innehålla själva svaret. ' +
+      'Krav: "svar" ska vara ETT enda RIKTIGT svenskt ord (inga engelska ord, ' +
+      'inga påhittade ord), endast bokstäver A-Ö, och använd å/ä/ö rätt (t.ex. SNÖ, ' +
+      'inte SNOW). Inga mellanslag, inga bindestreck. "ledtrad" ska vara på svenska, ' +
+      'kort, och får INTE innehålla själva svaret. ' +
       'För konkreta ord som går att avbilda: lägg till "bild" = ett kort ' +
       'engelskt motiv (t.ex. "a stethoscope"). För abstrakta ord: sätt "bild" till tom sträng. ' +
       'Svara ENDAST med giltig JSON i exakt detta format och inget annat: ' +
@@ -110,26 +111,34 @@
   // ---- Ord-leverantörer ----
 
   function fromGemini(theme, diff, count, signal, key) {
-    var model = (global.KORSORD_CONFIG && global.KORSORD_CONFIG.geminiModel) || 'gemini-2.0-flash';
+    var prim = (global.KORSORD_CONFIG && global.KORSORD_CONFIG.geminiModel) || 'gemini-2.5-flash';
+    // Prova vald modell, fall sedan till flash-lite (alltid gratiskvot, snabb).
+    var models = prim === 'gemini-2.5-flash-lite' ? [prim] : [prim, 'gemini-2.5-flash-lite'];
     var body = {
       contents: [{ parts: [{ text: buildPrompt(theme, diff, count) }] }],
       generationConfig: { temperature: 0.85, responseMimeType: 'application/json' }
     };
-    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + model +
-      ':generateContent?key=' + encodeURIComponent(key);
-    return fetch(url, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body), signal: signal
-    }).then(function (res) {
-      if (!res.ok) throw new Error('Gemini HTTP ' + res.status);
-      return res.json();
-    }).then(function (data) {
-      var t = data && data.candidates && data.candidates[0] && data.candidates[0].content &&
-        data.candidates[0].content.parts && data.candidates[0].content.parts[0] &&
-        data.candidates[0].content.parts[0].text;
-      if (typeof t !== 'string') t = JSON.stringify(data);
-      return listFrom(extractJson(t));
-    });
+    function attempt(i) {
+      var url = 'https://generativelanguage.googleapis.com/v1beta/models/' + models[i] +
+        ':generateContent?key=' + encodeURIComponent(key);
+      return fetch(url, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body), signal: signal
+      }).then(function (res) {
+        if (!res.ok) throw new Error('Gemini ' + models[i] + ' HTTP ' + res.status);
+        return res.json();
+      }).then(function (data) {
+        var t = data && data.candidates && data.candidates[0] && data.candidates[0].content &&
+          data.candidates[0].content.parts && data.candidates[0].content.parts[0] &&
+          data.candidates[0].content.parts[0].text;
+        if (typeof t !== 'string') t = JSON.stringify(data);
+        return listFrom(extractJson(t));
+      }).catch(function (err) {
+        if (i + 1 < models.length) return attempt(i + 1);
+        throw err;
+      });
+    }
+    return attempt(0);
   }
 
   function fromOpenRouter(theme, diff, count, signal, key) {
