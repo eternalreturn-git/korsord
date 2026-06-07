@@ -243,18 +243,21 @@
 
   // ---- Huvudfunktion ----
 
+  function delay(ms) { return new Promise(function (res) { setTimeout(res, ms); }); }
+
   function fetchThemeWords(theme, diff, count, apiKey) {
     theme = (theme || '').trim() || 'blandat';
     var key = (apiKey || '').trim();
     var providers = [];
     if (key) {
-      if (key.indexOf('sk-or') === 0) providers.push({ fn: fromOpenRouter, src: 'openrouter', key: key });
-      else providers.push({ fn: fromGemini, src: 'gemini', key: key });
+      // Försök LLM:en upp till 5 gånger (tysta retrys) — fel är oftast tillfälliga.
+      if (key.indexOf('sk-or') === 0) providers.push({ fn: fromOpenRouter, src: 'openrouter', key: key, retries: 5 });
+      else providers.push({ fn: fromGemini, src: 'gemini', key: key, retries: 5 });
     }
-    providers.push({ fn: fromPollinationsPost, src: 'pollinations' });
-    providers.push({ fn: fromPollinationsGet, src: 'pollinations' });
+    providers.push({ fn: fromPollinationsPost, src: 'pollinations', retries: 1 });
+    providers.push({ fn: fromPollinationsGet, src: 'pollinations', retries: 1 });
 
-    function tryP(i) {
+    function tryP(i, attempt) {
       if (i >= providers.length) {
         var matched = global.WordBank.matchKey(theme);
         return Promise.resolve({
@@ -263,19 +266,24 @@
         });
       }
       var p = providers[i];
+      var maxTries = p.retries || 1;
       return withTimeout(function (signal) {
         return p.fn(theme, diff, count, signal, p.key);
       }).then(function (list) {
         var clean = sanitize(list, theme);
         if (clean.length >= 8) return { words: clean, source: p.src, matched: true };
-        if (global.console) global.console.warn('Ordkälla gav för få ord (' + p.src + '): ' + (clean ? clean.length : 0));
-        return tryP(i + 1);
+        throw new Error('för få giltiga ord (' + (clean ? clean.length : 0) + ')');
       }).catch(function (err) {
-        if (global.console) global.console.warn('Ordkälla misslyckades (' + p.src + '): ' + (err && err.message));
-        return tryP(i + 1);
+        if (global.console) {
+          global.console.warn('LLM-försök ' + attempt + '/' + maxTries + ' (' + p.src + ') misslyckades: ' + (err && err.message));
+        }
+        if (attempt < maxTries) {
+          return delay(700).then(function () { return tryP(i, attempt + 1); });
+        }
+        return tryP(i + 1, 1);
       });
     }
-    return tryP(0);
+    return tryP(0, 1);
   }
 
   global.LLM = {
