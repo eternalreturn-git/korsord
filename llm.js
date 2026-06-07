@@ -35,8 +35,10 @@
       'inga påhittade ord), endast bokstäver A-Ö, och använd å/ä/ö rätt (t.ex. SNÖ, ' +
       'inte SNOW). Inga mellanslag, inga bindestreck. "ledtrad" ska vara på svenska, ' +
       'kort, och får INTE innehålla själva svaret. ' +
-      'För konkreta ord som går att avbilda: lägg till "bild" = ett kort ' +
-      'engelskt motiv (t.ex. "a stethoscope"). För abstrakta ord: sätt "bild" till tom sträng. ' +
+      '"bild": fyll i ENDAST för ord som är ett konkret, avbildbart FÖREMÅL, DJUR eller ' +
+      'PLATS — ett kort engelskt motiv som tydligt föreställer ordet (t.ex. "a polar bear", ' +
+      '"a sled"). För abstrakta ord (känslor, riktningar, egenskaper som t.ex. kyla, nord, ' +
+      'kall) MÅSTE "bild" vara tom sträng "". ' +
       'Svara ENDAST med giltig JSON i exakt detta format och inget annat: ' +
       '{"ord":[{"svar":"ORD","ledtrad":"text","bild":"a stethoscope"}]}';
   }
@@ -220,14 +222,21 @@
     }).catch(function () { return null; });
   }
 
-  // Returnerar en bild-URL för ordet (svensk Wikipedia på svaret, annars
-  // engelsk Wikipedia på motivet) eller null om inget hittas.
+  function cleanImgSubject(s) {
+    return String(s || '').toLowerCase()
+      .replace(/^(a|an|the)\s+/, '')   // "a polar bear" -> "polar bear"
+      .trim();
+  }
+
+  // Returnerar en bild-URL. Söker i FÖRSTA hand på det engelska motivet (mest
+  // träffsäkert för konkreta saker) på engelska Wikipedia, annars svenska svaret.
   function imageFor(answer, imgSubject) {
+    var subj = cleanImgSubject(imgSubject);
     return withTimeout(function (signal) {
-      return wikiThumb('sv', answer, signal).then(function (url) {
+      var first = subj ? wikiThumb('en', subj, signal) : Promise.resolve(null);
+      return first.then(function (url) {
         if (url) return url;
-        var alt = imgSubject || answer;
-        return wikiThumb('en', alt, signal);
+        return wikiThumb('sv', answer, signal);
       });
     }, IMG_TIMEOUT_MS).catch(function () { return null; });
   }

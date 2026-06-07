@@ -11,6 +11,9 @@
   var curEntry = null;
   var curDir = 'H';
   var lastCell = null;
+  var editOrder = [];        // ord i den ordning användaren senast skrev i dem (för Ångra)
+  var solutionShown = false; // växling för "Visa lösning"
+  var savedSnapshot = null;  // användarens ifyllning innan lösningen visades
 
   var el = {};
   function $(id) { return document.getElementById(id); }
@@ -186,6 +189,10 @@
   // ---- Rendering ----
 
   function renderGrid() {
+    editOrder = [];
+    solutionShown = false;
+    savedSnapshot = null;
+    if (el.revealAll) el.revealAll.textContent = 'Visa lösning';
     el.grid.innerHTML = '';
     el.grid.style.gridTemplateColumns = 'repeat(' + data.cols + ', var(--cs))';
     inputs = make2d(data.rows, data.cols, null);
@@ -396,8 +403,17 @@
     if (VALID.test(ch)) {
       inp.value = ch;
       inp.parentElement.classList.remove('wrong', 'correct');
+      noteEdit();
       moveNext();
     } else { inp.value = ''; }
+  }
+
+  // Kom ihåg vilket ord som senast redigerades (för Ångra-knappen).
+  function noteEdit() {
+    if (!curEntry) return;
+    var i = editOrder.indexOf(curEntry);
+    if (i >= 0) editOrder.splice(i, 1);
+    editOrder.push(curEntry);
   }
 
   function onKeyDown(ev) {
@@ -409,6 +425,7 @@
       ev.preventDefault();
       ev.target.value = k.toUpperCase();
       ev.target.parentElement.classList.remove('wrong', 'correct');
+      noteEdit();
       moveNext();
       return;
     }
@@ -522,27 +539,82 @@
     active.parentElement.classList.add('correct');
     moveNext(); markSolvedClues();
   }
+  // Växla: visa hela lösningen / dölj den och återställ användarens ifyllning.
   function onRevealAll() {
     if (!data) return;
-    for (var r = 0; r < data.rows; r++) for (var c = 0; c < data.cols; c++) {
-      var cell = data.cells[r][c], inp = inputs[r][c];
-      if (cell && cell.letter && inp) {
-        inp.value = cell.letter;
-        inp.parentElement.classList.remove('wrong');
-        inp.parentElement.classList.add('correct');
+    if (!solutionShown) {
+      savedSnapshot = snapshotValues();
+      for (var r = 0; r < data.rows; r++) for (var c = 0; c < data.cols; c++) {
+        var cell = data.cells[r][c], inp = inputs[r][c];
+        if (cell && cell.letter && inp) {
+          inp.value = cell.letter;
+          inp.parentElement.classList.remove('wrong');
+          inp.parentElement.classList.add('correct');
+        }
       }
+      solutionShown = true;
+      el.revealAll.textContent = 'Dölj lösning';
+      markSolvedClues();
+      setStatus('Lösningen visas. Tryck igen för att dölja den.');
+    } else {
+      restoreValues(savedSnapshot);
+      solutionShown = false;
+      el.revealAll.textContent = 'Visa lösning';
+      markSolvedClues();
+      setStatus('Lösningen dold.');
     }
-    markSolvedClues(); setStatus('Lösningen visas.');
   }
-  function onClear() {
-    if (!data) return;
+
+  function snapshotValues() {
+    var snap = [];
+    for (var r = 0; r < data.rows; r++) {
+      var row = [];
+      for (var c = 0; c < data.cols; c++) { var inp = inputs[r][c]; row.push(inp ? inp.value : null); }
+      snap.push(row);
+    }
+    return snap;
+  }
+  function restoreValues(snap) {
+    if (!snap) return;
     for (var r = 0; r < data.rows; r++) for (var c = 0; c < data.cols; c++) {
       var inp = inputs[r][c];
-      if (inp) { inp.value = ''; inp.parentElement.classList.remove('wrong', 'correct'); }
+      if (inp) { inp.value = (snap[r] && snap[r][c]) || ''; inp.parentElement.classList.remove('wrong', 'correct'); }
     }
-    [el.across, el.down].forEach(function (ul) {
-      for (var i = 0; i < ul.children.length; i++) ul.children[i].classList.remove('solved');
-    });
-    setStatus('Rensat.');
+  }
+
+  // Ångra: rensa det SENAST ifyllda ordet, sedan det näst senaste osv.
+  // Korsningsrutor lämnas kvar (de tillhör även ett annat ord).
+  function onClear() {
+    if (!data) return;
+    if (solutionShown) { onRevealAll(); return; }   // dölj lösningen först om den visas
+    while (editOrder.length) {
+      var e = editOrder[editOrder.length - 1];
+      var cells = cellsOfEntry(e);
+      var cleared = false;
+      for (var i = 0; i < cells.length; i++) {
+        var p = cells[i];
+        var inp = inputs[p.r][p.c];
+        if (!inp || !inp.value) continue;
+        // Korsningsruta: behåll bokstaven bara om det korsande ordet har fler
+        // ifyllda rutor (annars rensas den så att ordet försvinner helt).
+        if (acrossOf[p.r][p.c] && downOf[p.r][p.c]) {
+          var other = (e.dir === 'H') ? downOf[p.r][p.c] : acrossOf[p.r][p.c];
+          var otherHasMore = cellsOfEntry(other).some(function (q) {
+            return !(q.r === p.r && q.c === p.c) && inputs[q.r][q.c] && inputs[q.r][q.c].value;
+          });
+          if (otherHasMore) continue;
+        }
+        inp.value = '';
+        inp.parentElement.classList.remove('wrong', 'correct');
+        cleared = true;
+      }
+      editOrder.pop();
+      if (cleared) {
+        markSolvedClues();
+        setStatus('Ångrade ' + (e.number || '') + ' ' + (e.dir === 'H' ? 'vågrätt' : 'lodrätt') + '.');
+        return;
+      }
+    }
+    setStatus('Inget mer att ångra.');
   }
 })();

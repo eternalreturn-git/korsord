@@ -218,12 +218,9 @@
   function attachPictures(res, n) {
     res.pictures = [];
     if (!n) return;
-    var cand = res.placed.filter(function (e) { return e.len >= 3; });
-    cand.sort(function (a, b) {
-      var ai = a.img ? 0 : 1, bi = b.img ? 0 : 1;   // föredra ord med bildmotiv
-      if (ai !== bi) return ai - bi;
-      return a.len - b.len;                          // sen kortare (mer konkreta)
-    });
+    // ENDAST ord med ett konkret bildmotiv (img) blir bildord -> relevanta bilder.
+    var cand = res.placed.filter(function (e) { return e.len >= 3 && e.img; });
+    cand.sort(function (a, b) { return a.len - b.len; });   // kortare/mer ikoniska först
     var usedKeys = {};
     for (var i = 0; i < cand.length && res.pictures.length < n; i++) {
       var e = cand[i];
