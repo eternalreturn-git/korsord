@@ -209,9 +209,11 @@
     var area = (b.h * b.w) || 1;
     var density = used / area;               // andel fyllda rutor i bounding box
     var maxSide = b.h > b.w ? b.h : b.w;
+    var minSide = b.h < b.w ? b.h : b.w;
+    var aspect = maxSide / (minSide || 1);   // 1 = kvadrat, högre = avlångt
     var W = global.CW_W || {};
     return res.placed.length * (W.lw || 3200) + crossings * (W.lc || 700) +
-           density * (W.ld || 1700) - maxSide * (W.lm || 8);
+           density * (W.ld || 1700) - maxSide * (W.lm || 8) - aspect * (W.la || 3000);
   }
 
   // Märk upp till n ord som bildord och bestäm var bildrutan ska ligga.
@@ -279,7 +281,9 @@
     }
 
     if (opts.trim !== false) {
-      trimOutliers(best.res, Math.max(8, Math.ceil(best.res.placed.length * 0.72)));
+      var Wt = global.CW_W || {};
+      var keepFrac = Wt.trimKeep || 0.72;
+      trimOutliers(best.res, Math.max(7, Math.ceil(best.res.placed.length * keepFrac)));
     }
     attachPictures(best.res, nPictures);
     return finalize(best.res);

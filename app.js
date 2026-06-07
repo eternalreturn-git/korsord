@@ -14,6 +14,7 @@
   var editOrder = [];        // ord i den ordning användaren senast skrev i dem (för Ångra)
   var solutionShown = false; // växling för "Visa lösning"
   var savedSnapshot = null;  // användarens ifyllning innan lösningen visades
+  var checkShown = false;    // växling för "Kontrollera"
 
   var el = {};
   function $(id) { return document.getElementById(id); }
@@ -118,7 +119,7 @@
       localStorage.setItem('kw_diff', diff);
     } catch (e) {}
 
-    var count = diff === 'latt' ? 16 : diff === 'svar' ? 28 : 22;
+    var count = diff === 'latt' ? 16 : diff === 'svar' ? 24 : 20;
     var apiKey = effectiveKey();
     try { localStorage.setItem('kw_apikey', (el.apikey.value || '').trim()); } catch (e) {}
 
@@ -192,7 +193,9 @@
     editOrder = [];
     solutionShown = false;
     savedSnapshot = null;
+    checkShown = false;
     if (el.revealAll) el.revealAll.textContent = 'Visa lösning';
+    if (el.check) el.check.textContent = 'Kontrollera';
     el.grid.innerHTML = '';
     el.grid.style.gridTemplateColumns = 'repeat(' + data.cols + ', var(--cs))';
     inputs = make2d(data.rows, data.cols, null);
@@ -490,8 +493,20 @@
 
   // ---- Knappar ----
 
+  // Växla: markera rätt/fel / dölj markeringen igen.
   function onCheck() {
     if (!data) return;
+    if (checkShown) {
+      var nodes = el.grid.querySelectorAll('.cell.wrong, .cell.correct');
+      for (var i = 0; i < nodes.length; i++) nodes[i].classList.remove('wrong', 'correct');
+      [el.across, el.down].forEach(function (ul) {
+        for (var j = 0; j < ul.children.length; j++) ul.children[j].classList.remove('solved');
+      });
+      checkShown = false;
+      el.check.textContent = 'Kontrollera';
+      setStatus('Kontroll dold.');
+      return;
+    }
     var allFilled = true, allCorrect = true;
     for (var r = 0; r < data.rows; r++) {
       for (var c = 0; c < data.cols; c++) {
@@ -505,9 +520,11 @@
       }
     }
     markSolvedClues();
+    checkShown = true;
+    el.check.textContent = 'Dölj kontroll';
     if (allFilled && allCorrect) setStatus('Snyggt — allt rätt!');
-    else if (allCorrect) setStatus('Så långt rätt. Fortsätt!');
-    else setStatus('Några rutor är fel (rödmarkerade).');
+    else if (allCorrect) setStatus('Så långt rätt. Fortsätt! (Tryck igen för att dölja.)');
+    else setStatus('Rött = fel. Tryck igen för att dölja markeringen.');
   }
 
   function markSolvedClues() {
