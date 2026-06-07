@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#4f46e5">
+  <title>Korsord</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Korsord</h1>
+    <p class="tagline">Skriv ett tema, välj svårighetsgrad och få ett tätt korsord — med bildledtrådar.</p>
+  </header>
+
+  <section class="controls card">
+    <div class="field">
+      <label for="theme">Tema</label>
+      <input id="theme" type="text" placeholder="t.ex. djur, rymden, mat, sport…"
+             autocomplete="off" autocapitalize="off" spellcheck="false">
+    </div>
+
+    <div class="field">
+      <label>Svårighetsgrad</label>
+      <div class="seg" id="difficulty" role="group" aria-label="Svårighetsgrad">
+        <button type="button" data-val="latt">Lätt</button>
+        <button type="button" data-val="medel" class="on">Medel</button>
+        <button type="button" data-val="svar">Svår</button>
+      </div>
+    </div>
+
+    <button id="generate" class="primary">Generera</button>
+  </section>
+
+  <details class="apikey" id="apiBox">
+    <summary>Gratis API-nyckel — krävs för att generera temaord</summary>
+    <div class="apikey-body card">
+      <input id="apikey" type="password" autocomplete="off" spellcheck="false"
+             placeholder="Klistra in en gratis Gemini- (AIza…) eller OpenRouter-nyckel (sk-or…)">
+      <p class="hint">
+        Korsordet skapas av en riktig LLM över internet. Hämta en gratis nyckel (tar en minut,
+        <strong>inget kreditkort</strong>) på <strong>aistudio.google.com/apikey</strong> (Google Gemini)
+        eller <strong>openrouter.ai/keys</strong>. Nyckeln sparas bara lokalt på den här enheten.<br>
+        Tips för en iPad utan inloggning: lägg in nyckeln i filen <code>config.js</code> innan du laddar
+        upp sidan — då behöver användaren inte göra något. Utan nyckel visas bara reservord.
+      </p>
+    </div>
+  </details>
+
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+
+  <main class="board">
+    <div class="grid-wrap card">
+      <div id="grid" class="grid" aria-label="Korsordsrutnät"></div>
+    </div>
+
+    <div class="clues card">
+      <div class="clue-col">
+        <h2>Vågrätt</h2>
+        <ol id="across" class="clue-list"></ol>
+      </div>
+      <div class="clue-col">
+        <h2>Lodrätt</h2>
+        <ol id="down" class="clue-list"></ol>
+      </div>
+    </div>
+  </main>
+
+  <div class="actions">
+    <button id="check">Kontrollera</button>
+    <button id="revealCell">Visa bokstav</button>
+    <button id="revealAll">Visa lösning</button>
+    <button id="clear">Rensa</button>
+  </div>
+
+  <footer class="foot">
+    <span id="source-note"></span>
+  </footer>
+
+  <!-- Förstoring av bildledtråd -->
+  <div id="img-pop" class="img-pop" aria-hidden="true"></div>
+
+  <!-- Laddnings-overlay -->
+  <div id="overlay" class="overlay" hidden>
+    <div class="spinner"></div>
+    <div id="overlay-text" class="overlay-text">Hämtar ord…</div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="words.js"></script>
+  <script src="generator.js"></script>
+  <script src="llm.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
