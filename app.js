@@ -162,12 +162,14 @@
           ? (res.error || 'kunde inte nå LLM:en')
           : 'ingen API-nyckel angiven';
         setStatus('Reservord visas — ' + why, 'warn');
-        el.sourceNote.textContent = 'Lägg till en gratis API-nyckel i panelen ovan för att ' +
+        el.sourceNote.textContent = 'Lägg till/byt en gratis API-nyckel i panelen ovan för att ' +
           'generera riktiga ord om "' + (theme || 'blandat') + '".';
+        if (el.apiBox) el.apiBox.style.display = '';   // visa panelen så nyckeln kan rättas
       } else {
         setStatus('Klart — ' + placed + ' ord placerade, ' + data.pictures.length +
                   ' bildledtrådar. Källa: ' + describeSource(res) + '.');
         el.sourceNote.textContent = 'Tema: ' + (theme || 'blandat') + '. Ordkälla: ' + describeSource(res) + '.';
+        updateApiPanel();   // dölj panelen när allt funkar
       }
       setActionsEnabled(true);
       var first = data.entries.find(function (e) { return !e.picture; }) || data.entries[0];
