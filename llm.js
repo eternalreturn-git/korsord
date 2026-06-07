@@ -257,12 +257,13 @@
     providers.push({ fn: fromPollinationsPost, src: 'pollinations', retries: 1 });
     providers.push({ fn: fromPollinationsGet, src: 'pollinations', retries: 1 });
 
+    var keyErr = '';   // senaste felet från den nyckel-baserade LLM:en (för UI:t)
     function tryP(i, attempt) {
       if (i >= providers.length) {
         var matched = global.WordBank.matchKey(theme);
         return Promise.resolve({
           words: global.WordBank.forTheme(theme, diff, count),
-          source: 'offline', matched: !!matched
+          source: 'offline', matched: !!matched, error: keyErr
         });
       }
       var p = providers[i];
@@ -274,8 +275,10 @@
         if (clean.length >= 8) return { words: clean, source: p.src, matched: true };
         throw new Error('för få giltiga ord (' + (clean ? clean.length : 0) + ')');
       }).catch(function (err) {
+        var msg = (err && err.message) || String(err);
+        if (p.src === 'gemini' || p.src === 'openrouter') keyErr = msg;
         if (global.console) {
-          global.console.warn('LLM-försök ' + attempt + '/' + maxTries + ' (' + p.src + ') misslyckades: ' + (err && err.message));
+          global.console.warn('LLM-försök ' + attempt + '/' + maxTries + ' (' + p.src + ') misslyckades: ' + msg);
         }
         if (attempt < maxTries) {
           return delay(700).then(function () { return tryP(i, attempt + 1); });

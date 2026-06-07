@@ -159,9 +159,9 @@
       var placed = data.entries.length;
       if (res.source === 'offline') {
         var why = effectiveKey()
-          ? 'kunde inte nå LLM:en — kontrollera nyckel och internet'
+          ? (res.error || 'kunde inte nå LLM:en')
           : 'ingen API-nyckel angiven';
-        setStatus('Reservord visas (' + why + ').', 'warn');
+        setStatus('Reservord visas — ' + why, 'warn');
         el.sourceNote.textContent = 'Lägg till en gratis API-nyckel i panelen ovan för att ' +
           'generera riktiga ord om "' + (theme || 'blandat') + '".';
       } else {
