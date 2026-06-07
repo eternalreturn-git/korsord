@@ -43,12 +43,14 @@
       var d = localStorage.getItem('kw_diff');
       if (d) setDiff(d);
       var k = localStorage.getItem('kw_apikey') || '';
-      if (k) { el.apikey.value = k; }                 // håll panelen stängd även om nyckel finns
+      if (k) { el.apikey.value = k; }
     } catch (e) {}
 
     el.apikey.addEventListener('change', function () {
       try { localStorage.setItem('kw_apikey', el.apikey.value.trim()); } catch (e) {}
+      updateApiPanel();
     });
+    updateApiPanel();   // dölj panelen direkt om en nyckel redan finns
 
     // Segmentkontroll
     el.difficulty.addEventListener('click', function (ev) {
@@ -90,6 +92,11 @@
     var entered = (el.apikey && el.apikey.value || '').trim();
     if (entered) return entered;
     return (window.KORSORD_CONFIG && window.KORSORD_CONFIG.apiKey || '').trim();
+  }
+
+  // Dölj hela API-nyckelpanelen så fort en nyckel finns (inmatad eller i config).
+  function updateApiPanel() {
+    if (el.apiBox) el.apiBox.style.display = effectiveKey() ? 'none' : '';
   }
   function setActionsEnabled(on) {
     [el.check, el.revealCell, el.revealAll, el.clear].forEach(function (b) { if (b) b.disabled = !on; });
