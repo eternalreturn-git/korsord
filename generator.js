@@ -17,7 +17,9 @@
   function isLetter(cell) { return !!(cell && cell.letter); }
 
   // Prova att lägga `word` med start i (row,col) i riktning dir ('H'|'V').
-  function tryPlacement(grid, word, row, col, dir) {
+  // dirGrid spårar vilka riktningar (H/V) som redan upptar varje ruta, så att
+  // två ord i SAMMA riktning aldrig kan dela en ruta (korsningar är bara vinkelräta).
+  function tryPlacement(grid, dirGrid, word, row, col, dir) {
     var n = word.length;
     var dr = dir === 'V' ? 1 : 0;
     var dc = dir === 'H' ? 1 : 0;
@@ -28,11 +30,13 @@
     var intersections = 0;
     for (var i = 0; i < n; i++) {
       var r = row + dr * i, c = col + dc * i;
-      var cur = grid.get(key(r, c));
+      var k = key(r, c);
+      var cur = grid.get(k);
       var ch = word.charAt(i);
       if (cur !== undefined) {
-        if (cur !== ch) return null;   // krock: olika bokstäver
-        intersections++;               // giltig korsning
+        if (cur !== ch) return null;                                // krock: olika bokstäver
+        if ((dirGrid.get(k) || '').indexOf(dir) >= 0) return null;  // redan ett ord i samma riktning här
+        intersections++;                                            // giltig vinkelrät korsning
       } else {
         if (dir === 'H') {
           if (grid.has(key(r - 1, c)) || grid.has(key(r + 1, c))) return null;
@@ -44,11 +48,13 @@
     return { row: row, col: col, dir: dir, intersections: intersections };
   }
 
-  function commit(grid, placed, item, p) {
+  function commit(grid, dirGrid, placed, item, p) {
     var word = item.answer;
     var dr = p.dir === 'V' ? 1 : 0, dc = p.dir === 'H' ? 1 : 0;
     for (var i = 0; i < word.length; i++) {
-      grid.set(key(p.row + dr * i, p.col + dc * i), word.charAt(i));
+      var k = key(p.row + dr * i, p.col + dc * i);
+      grid.set(k, word.charAt(i));
+      dirGrid.set(k, (dirGrid.get(k) || '') + p.dir);
     }
     placed.push({
       answer: word, clue: item.clue, img: item.img || '',
@@ -80,23 +86,24 @@
 
   function attempt(items, firstDir, rng, explore) {
     var grid = new Map();
+    var dirGrid = new Map();
     var placed = [];
-    commit(grid, placed, items[0], { row: 0, col: 0, dir: firstDir || 'H', intersections: 0 });
+    commit(grid, dirGrid, placed, items[0], { row: 0, col: 0, dir: firstDir || 'H', intersections: 0 });
 
     var unplaced = [];
     for (var idx = 1; idx < items.length; idx++) {
-      placeOne(grid, placed, items[idx], unplaced, rng, explore);
+      placeOne(grid, dirGrid, placed, items[idx], unplaced, rng, explore);
     }
     // andra svepet — nu finns fler ankarpunkter; greedy (ej utforskande)
     for (var k = unplaced.length - 1; k >= 0; k--) {
-      if (placeOne(grid, placed, unplaced[k], null, null, false)) unplaced.splice(k, 1);
+      if (placeOne(grid, dirGrid, placed, unplaced[k], null, null, false)) unplaced.splice(k, 1);
     }
     return { grid: grid, placed: placed, unplaced: unplaced };
   }
 
   // Samla alla giltiga placeringar, poängsätt (korsningar + kompakthet) och
   // välj bästa — eller, i utforskningsläge, slumpa bland topp-kandidaterna.
-  function placeOne(grid, placed, item, unplacedSink, rng, explore) {
+  function placeOne(grid, dirGrid, placed, item, unplacedSink, rng, explore) {
     var word = item.answer;
     var ob = bounds(placed);
     var oldArea = ob.h * ob.w;
@@ -113,7 +120,7 @@
           var ndir = pw.dir === 'H' ? 'V' : 'H';
           var ndr = ndir === 'V' ? 1 : 0, ndc = ndir === 'H' ? 1 : 0;
           var sr = cr - ndr * j, sc = cc - ndc * j;
-          var p = tryPlacement(grid, word, sr, sc, ndir);
+          var p = tryPlacement(grid, dirGrid, word, sr, sc, ndir);
           if (!p) continue;
           var b = bounds(placed.concat([{ row: sr, col: sc, dir: ndir, len: word.length }]));
           var growth = b.h * b.w - oldArea;
@@ -132,7 +139,7 @@
     } else {
       pick = cands[0];
     }
-    commit(grid, placed, item, pick);
+    commit(grid, dirGrid, placed, item, pick);
     return true;
   }
 
@@ -333,24 +340,9 @@
       }
     }
 
+    // Numret visas på ALLA ords första ruta — även bildord (bilden bredvid är
+    // dess ledtråd; pilen pekar in i ordet).
     entries.forEach(function (e) { e.number = startMap[e.row + ',' + e.col] || null; });
-
-    // Dölj numret i rutor där ENDAST bildord startar (bilden är ledtråden)
-    var startsByCell = {};
-    entries.forEach(function (e) {
-      var k = e.row + ',' + e.col;
-      (startsByCell[k] = startsByCell[k] || []).push(e);
-    });
-    for (var ks in startsByCell) {
-      if (!startsByCell.hasOwnProperty(ks)) continue;
-      var arr2 = startsByCell[ks];
-      var anyText = arr2.some(function (e) { return !e.picture; });
-      if (!anyText) {
-        var pp = ks.split(',');
-        var lc = cells[parseInt(pp[0], 10)][parseInt(pp[1], 10)];
-        if (lc) lc.number = null;
-      }
-    }
 
     entries.sort(function (a, b2) {
       if (a.number !== b2.number) return (a.number || 0) - (b2.number || 0);
